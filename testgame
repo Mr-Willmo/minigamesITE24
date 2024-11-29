@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DDoS Attack Educational Simulation</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+        }
+        #controls {
+            margin: 20px 0;
+        }
+        button {
+            padding: 10px 15px;
+            margin: 0 10px;
+            border: none;
+            border-radius: 5px;
+            background: #4CAF50;
+            color: white;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        #status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            background: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>DDoS Attack Educational Simulation</h1>
+    <div id="controls">
+        <button id="normalTraffic">Normal Traffic</button>
+        <button id="startDDoS">Simulate DDoS</button>
+        <button id="addDefense">Add Defense</button>
+        <button id="reset">Reset</button>
+    </div>
+    <div id="status">Status: Normal traffic flow</div>
+    <div id="simulation"></div>
+
+    <script>
+        // Initialize PIXI Application
+        const app = new PIXI.Application({
+            width: 800,
+            height: 400,
+            backgroundColor: 0xEEEEEE,
+        });
+        document.getElementById('simulation').appendChild(app.view);
+
+        // Create server sprite
+        const server = new PIXI.Graphics();
+        server.beginFill(0x4CAF50);
+        server.drawRect(700, 150, 60, 100);
+        server.endFill();
+        app.stage.addChild(server);
+
+        // Create text label for server
+        const serverLabel = new PIXI.Text('Server', {
+            fontFamily: 'Arial',
+            fontSize: 14,
+            fill: 0x000000
+        });
+        serverLabel.x = 705;
+        serverLabel.y = 260;
+        app.stage.addChild(serverLabel);
+
+        let packets = [];
+        let isDefenseActive = false;
+        let isDDoSActive = false;
+
+        function createPacket(isDDoS = false) {
+            const packet = new PIXI.Graphics();
+            packet.beginFill(isDDoS ? 0xFF0000 : 0x3498db);
+            packet.drawCircle(0, 0, 5);
+            packet.endFill();
+            packet.x = 0;
+            packet.y = Math.random() * 350;
+            packet.speed = isDDoS ? 3 : 2;
+            packet.isDDoS = isDDoS;
+            app.stage.addChild(packet);
+            packets.push(packet);
+        }
+
+        // Animation loop
+        app.ticker.add(() => {
+            // Update packet positions
+            for (let i = packets.length - 1; i >= 0; i--) {
+                const packet = packets[i];
+                packet.x += packet.speed;
+
+                // Check if packet hits server or defense
+                if (packet.x >= 700) {
+                    if (isDefenseActive && packet.isDDoS) {
+                        // Packet gets blocked
+                        app.stage.removeChild(packet);
+                        packets.splice(i, 1);
+                    } else {
+                        // Packet reaches server
+                        packet.x = 0;
+                        packet.y = Math.random() * 350;
+                    }
+                }
+            }
+        });
+
+        // Button event listeners
+        document.getElementById('normalTraffic').addEventListener('click', () => {
+            isDDoSActive = false;
+            setInterval(() => {
+                if (!isDDoSActive) {
+                    createPacket(false);
+                }
+            }, 500);
+            document.getElementById('status').textContent = 'Status: Normal traffic flow';
+        });
+
+        document.getElementById('startDDoS').addEventListener('click', () => {
+            isDDoSActive = true;
+            setInterval(() => {
+                if (isDDoSActive) {
+                    for (let i = 0; i < 5; i++) {
+                        createPacket(true);
+                    }
+                }
+            }, 200);
+            document.getElementById('status').textContent = 'Status: DDoS attack in progress';
+        });
+
+        document.getElementById('addDefense').addEventListener('click', () => {
+            isDefenseActive = true;
+            // Create defense barrier visualization
+            const defense = new PIXI.Graphics();
+            defense.beginFill(0xFFFF00, 0.3);
+            defense.drawRect(650, 0, 10, 400);
+            defense.endFill();
+            app.stage.addChild(defense);
+            document.getElementById('status').textContent = 'Status: Defense barrier active';
+        });
+
+        document.getElementById('reset').addEventListener('click', () => {
+            // Clear all packets
+            for (const packet of packets) {
+                app.stage.removeChild(packet);
+            }
+            packets = [];
+            isDDoSActive = false;
+            isDefenseActive = false;
+            // Remove defense barrier
+            app.stage.removeChild(app.stage.children[app.stage.children.length - 1]);
+            document.getElementById('status').textContent = 'Status: Simulation reset';
+        });
+    </script>
+</body>
+</html>
