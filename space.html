@@ -1,212 +1,272 @@
-import React, { useState, useEffect, useCallback } from 'react';
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Space Shooter</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #1a1a1a;
+            font-family: Arial, sans-serif;
+            color: white;
+        }
+        #gameCanvas {
+            border: 2px solid #3b82f6;
+            background-color: black;
+        }
+        #score {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        .menu {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 18px;
+            background-color: #3b82f6;
+            border: none;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #2563eb;
+        }
+    </style>
+</head>
+<body>
+    <div id="score">Score: 0</div>
+    <canvas id="gameCanvas" width="600" height="600"></canvas>
 
-const SpaceShooter = () => {
-  const [playerPos, setPlayerPos] = useState({ x: 300, y: 500 });
-  const [bullets, setBullets] = useState([]);
-  const [enemies, setEnemies] = useState([]);
-  const [score, setScore] = useState(0);
-  const [gameOver, setGameOver] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
 
-  // Game settings
-  const GAME_WIDTH = 600;
-  const GAME_HEIGHT = 600;
-  const PLAYER_SIZE = 40;
-  const BULLET_SIZE = 5;
-  const ENEMY_SIZE = 30;
+        // Game state
+        let playerPos = { x: 280, y: 520 };
+        let bullets = [];
+        let enemies = [];
+        let score = 0;
+        let isPlaying = false;
+        let gameOver = false;
 
-  // Handle keyboard input for player movement
-  const handleKeyPress = useCallback((e) => {
-    if (!isPlaying) return;
-    
-    const MOVE_AMOUNT = 20;
-    setPlayerPos(prev => {
-      let newX = prev.x;
-      let newY = prev.y;
+        // Game constants
+        const PLAYER_SIZE = 40;
+        const BULLET_SIZE = 5;
+        const ENEMY_SIZE = 30;
+        const PLAYER_SPEED = 5;
+        const BULLET_SPEED = 7;
+        const ENEMY_SPEED = 2;
 
-      switch (e.key) {
-        case 'ArrowLeft':
-          newX = Math.max(0, prev.x - MOVE_AMOUNT);
-          break;
-        case 'ArrowRight':
-          newX = Math.min(GAME_WIDTH - PLAYER_SIZE, prev.x + MOVE_AMOUNT);
-          break;
-        case ' ': // Spacebar
-          setBullets(prev => [...prev, { x: playerPos.x + PLAYER_SIZE/2, y: playerPos.y }]);
-          break;
-        default:
-          break;
-      }
-
-      return { x: newX, y: newY };
-    });
-  }, [isPlaying, playerPos.x, playerPos.y]);
-
-  // Game loop
-  useEffect(() => {
-    if (!isPlaying) return;
-
-    const gameLoop = setInterval(() => {
-      // Move bullets
-      setBullets(prev => prev
-        .map(bullet => ({ ...bullet, y: bullet.y - 5 }))
-        .filter(bullet => bullet.y > 0)
-      );
-
-      // Move enemies
-      setEnemies(prev => prev
-        .map(enemy => ({ ...enemy, y: enemy.y + 2 }))
-        .filter(enemy => enemy.y < GAME_HEIGHT)
-      );
-
-      // Spawn enemies
-      if (Math.random() < 0.03) {
-        const newEnemy = {
-          x: Math.random() * (GAME_WIDTH - ENEMY_SIZE),
-          y: -ENEMY_SIZE
+        // Key state
+        const keys = {
+            ArrowLeft: false,
+            ArrowRight: false,
+            Space: false
         };
-        setEnemies(prev => [...prev, newEnemy]);
-      }
 
-      // Check collisions
-      setBullets(prev => {
-        const newBullets = [...prev];
-        setEnemies(prevEnemies => {
-          const newEnemies = prevEnemies.filter(enemy => {
-            // Check each bullet against this enemy
-            const hitByBullet = newBullets.some((bullet, bulletIndex) => {
-              if (bullet.x > enemy.x && 
-                  bullet.x < enemy.x + ENEMY_SIZE &&
-                  bullet.y > enemy.y &&
-                  bullet.y < enemy.y + ENEMY_SIZE) {
-                newBullets.splice(bulletIndex, 1);
-                setScore(s => s + 10);
-                return true;
-              }
-              return false;
-            });
-            return !hitByBullet;
-          });
-
-          // Check player collision
-          newEnemies.forEach(enemy => {
-            if (enemy.x < playerPos.x + PLAYER_SIZE &&
-                enemy.x + ENEMY_SIZE > playerPos.x &&
-                enemy.y < playerPos.y + PLAYER_SIZE &&
-                enemy.y + ENEMY_SIZE > playerPos.y) {
-              setGameOver(true);
-              setIsPlaying(false);
+        // Event Listeners
+        document.addEventListener('keydown', (e) => {
+            if (e.code in keys) {
+                keys[e.code] = true;
+                if (e.code === 'Space') {
+                    e.preventDefault();
+                }
             }
-          });
-
-          return newEnemies;
         });
-        return newBullets;
-      });
-    }, 16);
 
-    return () => clearInterval(gameLoop);
-  }, [isPlaying, playerPos.x, playerPos.y]);
+        document.addEventListener('keyup', (e) => {
+            if (e.code in keys) {
+                keys[e.code] = false;
+            }
+        });
 
-  // Set up keyboard event listeners
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [handleKeyPress]);
+        function drawTriangle(x, y, size, color, pointsUp) {
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            if (pointsUp) {
+                ctx.moveTo(x + size/2, y);
+                ctx.lineTo(x, y + size);
+                ctx.lineTo(x + size, y + size);
+            } else {
+                ctx.moveTo(x + size/2, y + size);
+                ctx.lineTo(x, y);
+                ctx.lineTo(x + size, y);
+            }
+            ctx.closePath();
+            ctx.fill();
+        }
 
-  const startGame = () => {
-    setGameOver(false);
-    setScore(0);
-    setPlayerPos({ x: 300, y: 500 });
-    setBullets([]);
-    setEnemies([]);
-    setIsPlaying(true);
-  };
+        function drawPlayer() {
+            drawTriangle(playerPos.x, playerPos.y, PLAYER_SIZE, '#3b82f6', true);
+        }
 
-  return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-4">
-      <div className="mb-4 text-xl">Score: {score}</div>
-      
-      <div 
-        className="relative bg-black border-2 border-blue-500" 
-        style={{ width: GAME_WIDTH, height: GAME_HEIGHT }}
-      >
-        {/* Player */}
-        <div
-          className="absolute bg-blue-500"
-          style={{
-            left: playerPos.x,
-            top: playerPos.y,
-            width: PLAYER_SIZE,
-            height: PLAYER_SIZE,
-            clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)'
-          }}
-        />
+        function drawBullets() {
+            ctx.fillStyle = '#fbbf24';
+            bullets.forEach(bullet => {
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, BULLET_SIZE/2, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
 
-        {/* Bullets */}
-        {bullets.map((bullet, index) => (
-          <div
-            key={index}
-            className="absolute bg-yellow-400 rounded-full"
-            style={{
-              left: bullet.x,
-              top: bullet.y,
-              width: BULLET_SIZE,
-              height: BULLET_SIZE
-            }}
-          />
-        ))}
+        function drawEnemies() {
+            enemies.forEach(enemy => {
+                drawTriangle(enemy.x, enemy.y, ENEMY_SIZE, '#ef4444', false);
+            });
+        }
 
-        {/* Enemies */}
-        {enemies.map((enemy, index) => (
-          <div
-            key={index}
-            className="absolute bg-red-500"
-            style={{
-              left: enemy.x,
-              top: enemy.y,
-              width: ENEMY_SIZE,
-              height: ENEMY_SIZE,
-              clipPath: 'polygon(50% 100%, 0% 0%, 100% 0%)'
-            }}
-          />
-        ))}
+        function updateGame() {
+            if (!isPlaying) return;
 
-        {/* Game Over Screen */}
-        {gameOver && (
-          <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center">
-            <div className="text-center">
-              <h2 className="text-2xl mb-4">Game Over!</h2>
-              <p className="mb-4">Final Score: {score}</p>
-              <button
-                onClick={startGame}
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded"
-              >
-                Play Again
-              </button>
-            </div>
-          </div>
-        )}
+            // Move player
+            if (keys.ArrowLeft) playerPos.x = Math.max(0, playerPos.x - PLAYER_SPEED);
+            if (keys.ArrowRight) playerPos.x = Math.min(canvas.width - PLAYER_SIZE, playerPos.x + PLAYER_SPEED);
+            
+            // Shoot bullets
+            if (keys.Space) {
+                if (bullets.length === 0 || bullets[bullets.length-1].y < playerPos.y - 30) {
+                    bullets.push({
+                        x: playerPos.x + PLAYER_SIZE/2,
+                        y: playerPos.y
+                    });
+                }
+            }
 
-        {/* Start Screen */}
-        {!isPlaying && !gameOver && (
-          <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center">
-            <div className="text-center">
-              <h2 className="text-2xl mb-4">Space Shooter</h2>
-              <p className="mb-2">Use ← → to move</p>
-              <p className="mb-4">Space to shoot</p>
-              <button
-                onClick={startGame}
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded"
-              >
-                Start Game
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
+            // Update bullets
+            bullets = bullets.filter(bullet => {
+                bullet.y -= BULLET_SPEED;
+                return bullet.y > 0;
+            });
 
-export default SpaceShooter;
+            // Spawn enemies
+            if (Math.random() < 0.02) {
+                enemies.push({
+                    x: Math.random() * (canvas.width - ENEMY_SIZE),
+                    y: -ENEMY_SIZE
+                });
+            }
+
+            // Update enemies
+            enemies = enemies.filter(enemy => {
+                enemy.y += ENEMY_SPEED;
+                
+                // Check collision with player
+                if (enemy.x < playerPos.x + PLAYER_SIZE &&
+                    enemy.x + ENEMY_SIZE > playerPos.x &&
+                    enemy.y < playerPos.y + PLAYER_SIZE &&
+                    enemy.y + ENEMY_SIZE > playerPos.y) {
+                    gameOver = true;
+                    isPlaying = false;
+                    showGameOver();
+                }
+
+                return enemy.y < canvas.height;
+            });
+
+            // Check bullet collisions
+            bullets = bullets.filter(bullet => {
+                let bulletHit = false;
+                enemies = enemies.filter(enemy => {
+                    if (bullet.x > enemy.x &&
+                        bullet.x < enemy.x + ENEMY_SIZE &&
+                        bullet.y > enemy.y &&
+                        bullet.y < enemy.y + ENEMY_SIZE) {
+                        score += 10;
+                        scoreElement.textContent = `Score: ${score}`;
+                        bulletHit = true;
+                        return false;
+                    }
+                    return true;
+                });
+                return !bulletHit;
+            });
+        }
+
+        function drawGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawPlayer();
+            drawBullets();
+            drawEnemies();
+        }
+
+        function gameLoop() {
+            updateGame();
+            drawGame();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function showStartMenu() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = 'white';
+            ctx.font = '24px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Space Shooter', canvas.width/2, canvas.height/2 - 60);
+            ctx.font = '18px Arial';
+            ctx.fillText('Use ← → to move', canvas.width/2, canvas.height/2 - 20);
+            ctx.fillText('Space to shoot', canvas.width/2, canvas.height/2 + 10);
+            
+            const button = document.createElement('button');
+            button.textContent = 'Start Game';
+            button.style.position = 'absolute';
+            button.style.left = `${canvas.offsetLeft + canvas.width/2 - 50}px`;
+            button.style.top = `${canvas.offsetTop + canvas.height/2 + 40}px`;
+            button.onclick = startGame;
+            document.body.appendChild(button);
+        }
+
+        function showGameOver() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = 'white';
+            ctx.font = '24px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Game Over!', canvas.width/2, canvas.height/2 - 40);
+            ctx.fillText(`Final Score: ${score}`, canvas.width/2, canvas.height/2);
+            
+            const button = document.createElement('button');
+            button.textContent = 'Play Again';
+            button.style.position = 'absolute';
+            button.style.left = `${canvas.offsetLeft + canvas.width/2 - 50}px`;
+            button.style.top = `${canvas.offsetTop + canvas.height/2 + 20}px`;
+            button.onclick = startGame;
+            document.body.appendChild(button);
+        }
+
+        function startGame() {
+            // Remove any existing buttons
+            document.querySelectorAll('button').forEach(button => button.remove());
+            
+            // Reset game state
+            playerPos = { x: 280, y: 520 };
+            bullets = [];
+            enemies = [];
+            score = 0;
+            gameOver = false;
+            isPlaying = true;
+            scoreElement.textContent = 'Score: 0';
+        }
+
+        // Start the game loop
+        gameLoop();
+        showStartMenu();
+    </script>
+</body>
+</html>
