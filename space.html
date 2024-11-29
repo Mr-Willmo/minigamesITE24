@@ -1,0 +1,212 @@
+import React, { useState, useEffect, useCallback } from 'react';
+
+const SpaceShooter = () => {
+  const [playerPos, setPlayerPos] = useState({ x: 300, y: 500 });
+  const [bullets, setBullets] = useState([]);
+  const [enemies, setEnemies] = useState([]);
+  const [score, setScore] = useState(0);
+  const [gameOver, setGameOver] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  // Game settings
+  const GAME_WIDTH = 600;
+  const GAME_HEIGHT = 600;
+  const PLAYER_SIZE = 40;
+  const BULLET_SIZE = 5;
+  const ENEMY_SIZE = 30;
+
+  // Handle keyboard input for player movement
+  const handleKeyPress = useCallback((e) => {
+    if (!isPlaying) return;
+    
+    const MOVE_AMOUNT = 20;
+    setPlayerPos(prev => {
+      let newX = prev.x;
+      let newY = prev.y;
+
+      switch (e.key) {
+        case 'ArrowLeft':
+          newX = Math.max(0, prev.x - MOVE_AMOUNT);
+          break;
+        case 'ArrowRight':
+          newX = Math.min(GAME_WIDTH - PLAYER_SIZE, prev.x + MOVE_AMOUNT);
+          break;
+        case ' ': // Spacebar
+          setBullets(prev => [...prev, { x: playerPos.x + PLAYER_SIZE/2, y: playerPos.y }]);
+          break;
+        default:
+          break;
+      }
+
+      return { x: newX, y: newY };
+    });
+  }, [isPlaying, playerPos.x, playerPos.y]);
+
+  // Game loop
+  useEffect(() => {
+    if (!isPlaying) return;
+
+    const gameLoop = setInterval(() => {
+      // Move bullets
+      setBullets(prev => prev
+        .map(bullet => ({ ...bullet, y: bullet.y - 5 }))
+        .filter(bullet => bullet.y > 0)
+      );
+
+      // Move enemies
+      setEnemies(prev => prev
+        .map(enemy => ({ ...enemy, y: enemy.y + 2 }))
+        .filter(enemy => enemy.y < GAME_HEIGHT)
+      );
+
+      // Spawn enemies
+      if (Math.random() < 0.03) {
+        const newEnemy = {
+          x: Math.random() * (GAME_WIDTH - ENEMY_SIZE),
+          y: -ENEMY_SIZE
+        };
+        setEnemies(prev => [...prev, newEnemy]);
+      }
+
+      // Check collisions
+      setBullets(prev => {
+        const newBullets = [...prev];
+        setEnemies(prevEnemies => {
+          const newEnemies = prevEnemies.filter(enemy => {
+            // Check each bullet against this enemy
+            const hitByBullet = newBullets.some((bullet, bulletIndex) => {
+              if (bullet.x > enemy.x && 
+                  bullet.x < enemy.x + ENEMY_SIZE &&
+                  bullet.y > enemy.y &&
+                  bullet.y < enemy.y + ENEMY_SIZE) {
+                newBullets.splice(bulletIndex, 1);
+                setScore(s => s + 10);
+                return true;
+              }
+              return false;
+            });
+            return !hitByBullet;
+          });
+
+          // Check player collision
+          newEnemies.forEach(enemy => {
+            if (enemy.x < playerPos.x + PLAYER_SIZE &&
+                enemy.x + ENEMY_SIZE > playerPos.x &&
+                enemy.y < playerPos.y + PLAYER_SIZE &&
+                enemy.y + ENEMY_SIZE > playerPos.y) {
+              setGameOver(true);
+              setIsPlaying(false);
+            }
+          });
+
+          return newEnemies;
+        });
+        return newBullets;
+      });
+    }, 16);
+
+    return () => clearInterval(gameLoop);
+  }, [isPlaying, playerPos.x, playerPos.y]);
+
+  // Set up keyboard event listeners
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [handleKeyPress]);
+
+  const startGame = () => {
+    setGameOver(false);
+    setScore(0);
+    setPlayerPos({ x: 300, y: 500 });
+    setBullets([]);
+    setEnemies([]);
+    setIsPlaying(true);
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-4">
+      <div className="mb-4 text-xl">Score: {score}</div>
+      
+      <div 
+        className="relative bg-black border-2 border-blue-500" 
+        style={{ width: GAME_WIDTH, height: GAME_HEIGHT }}
+      >
+        {/* Player */}
+        <div
+          className="absolute bg-blue-500"
+          style={{
+            left: playerPos.x,
+            top: playerPos.y,
+            width: PLAYER_SIZE,
+            height: PLAYER_SIZE,
+            clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)'
+          }}
+        />
+
+        {/* Bullets */}
+        {bullets.map((bullet, index) => (
+          <div
+            key={index}
+            className="absolute bg-yellow-400 rounded-full"
+            style={{
+              left: bullet.x,
+              top: bullet.y,
+              width: BULLET_SIZE,
+              height: BULLET_SIZE
+            }}
+          />
+        ))}
+
+        {/* Enemies */}
+        {enemies.map((enemy, index) => (
+          <div
+            key={index}
+            className="absolute bg-red-500"
+            style={{
+              left: enemy.x,
+              top: enemy.y,
+              width: ENEMY_SIZE,
+              height: ENEMY_SIZE,
+              clipPath: 'polygon(50% 100%, 0% 0%, 100% 0%)'
+            }}
+          />
+        ))}
+
+        {/* Game Over Screen */}
+        {gameOver && (
+          <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center">
+            <div className="text-center">
+              <h2 className="text-2xl mb-4">Game Over!</h2>
+              <p className="mb-4">Final Score: {score}</p>
+              <button
+                onClick={startGame}
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded"
+              >
+                Play Again
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Start Screen */}
+        {!isPlaying && !gameOver && (
+          <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center">
+            <div className="text-center">
+              <h2 className="text-2xl mb-4">Space Shooter</h2>
+              <p className="mb-2">Use ← → to move</p>
+              <p className="mb-4">Space to shoot</p>
+              <button
+                onClick={startGame}
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded"
+              >
+                Start Game
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default SpaceShooter;
